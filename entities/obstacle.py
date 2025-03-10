@@ -1,382 +1,481 @@
 """
-障碍物类
-包括静态和移动的障碍物
+障碍物实体
+定义游戏中的各种障碍物类型和行为
 """
 
 import pygame
 import random
 import math
 from config import (
-    GRID_WIDTH, GRID_HEIGHT, GRID_SIZE, OBSTACLE_TYPES
+    GRID_SIZE, GRID_WIDTH, GRID_HEIGHT, OBSTACLE_TYPES,
+    PVZ_GREEN, PVZ_DARK_GREEN, DIFFICULTY_LEVELS, OBSTACLES_IMAGES_DIR
 )
 
 class BaseObstacle:
     """
     基础障碍物类
-    所有障碍物的基类
+    所有障碍物类型的父类
     """
     
-    def __init__(self, position=None):
+    def __init__(self):
+        """初始化障碍物"""
+        self.position = (0, 0)  # 障碍物位置
+        self.speed = 0  # 移动速度
+        self.damage = 1  # 造成的伤害
+        self.image = None  # 障碍物图像
+        
+        # 动画参数
+        self.animation_offset = random.random() * math.pi * 2  # 随机初始偏移
+        self.animation_speed = 0.05
+    
+    def spawn(self, avoid_positions=None):
         """
-        初始化障碍物
+        在随机位置生成障碍物
         
         参数:
-            position (tuple): 障碍物初始位置，如果为None则随机生成
-        """
-        self.position = position or self.generate_position()
-        self.damage = 1  # 障碍物造成的伤害
-        self.is_static = True  # 是否静态障碍物
-        self.animation_time = 0  # 动画计时器
-    
-    def generate_position(self):
-        """
-        生成随机位置
-        
+            avoid_positions: 需要避开的位置列表
+            
         返回:
-            tuple: 位置坐标 (x, y)
+            bool: 是否成功生成
         """
-        # 避免在中央区域生成，给玩家留出初始空间
-        center_x, center_y = GRID_WIDTH // 2, GRID_HEIGHT // 2
-        safe_radius = 5  # 中央安全区域半径
+        if avoid_positions is None:
+            avoid_positions = []
         
-        while True:
+        # 尝试最多10次找到一个可用位置
+        for _ in range(10):
             x = random.randint(0, GRID_WIDTH - 1)
             y = random.randint(0, GRID_HEIGHT - 1)
             
-            # 检查是否在安全区域内
-            distance = math.sqrt((x - center_x) ** 2 + (y - center_y) ** 2)
-            if distance > safe_radius:
-                return (x, y)
+            # 检查位置是否可用
+            if (x, y) not in avoid_positions:
+                self.position = (x, y)
+                return True
+        
+        # 如果尝试10次都失败，返回False
+        return False
     
-    def update(self, delta_time):
+    def update(self, delta_time, avoid_positions=None):
         """
         更新障碍物状态
         
         参数:
-            delta_time: 时间增量（秒）
+            delta_time: 时间增量
+            avoid_positions: 需要避开的位置列表
         """
-        self.animation_time += delta_time
+        # 更新动画
+        self.animation_offset = (self.animation_offset + self.animation_speed) % (math.pi * 2)
     
-    def check_collision(self, snake):
-        """
-        检查是否与蛇发生碰撞
-        
-        参数:
-            snake: 蛇对象
-        
-        返回:
-            bool: 是否碰撞
-        """
-        # 检查蛇头是否与障碍物碰撞
-        if snake.get_head_position() == self.position:
-            # 如果蛇不是无敌状态，则判定为碰撞
-            if not snake.is_invincible():
-                return True
-        
-        return False
-    
-    def draw(self, surface):
+    def draw(self, surface, grid_size, use_images=True):
         """
         绘制障碍物
         
         参数:
-            surface: 渲染目标表面
+            surface: 绘制表面
+            grid_size: 网格大小
+            use_images: 是否使用图像
         """
-        pass
+        if not self.position:
+            return
+            
+        # 计算实际像素位置
+        x, y = self.position
+        pixel_x = x * grid_size
+        pixel_y = y * grid_size
+        
+        # 如果有图像并且设置使用图像，则绘制图像
+        if self.image is not None and use_images:
+            # 居中绘制图像
+            image_rect = self.image.get_rect(center=(pixel_x + grid_size // 2, pixel_y + grid_size // 2))
+            surface.blit(self.image, image_rect)
+        else:
+            # 否则绘制简单图形
+            pygame.draw.rect(
+                surface,
+                PVZ_DARK_GREEN,
+                pygame.Rect(pixel_x + 5, pixel_y + 5, grid_size - 10, grid_size - 10)
+            )
+
 
 class TombstoneObstacle(BaseObstacle):
     """
-    坟墓障碍物类
-    静态障碍物
+    墓碑障碍物
+    静止不动的障碍物
     """
     
-    def __init__(self, position=None):
-        """初始化坟墓障碍物"""
-        super().__init__(position)
-        self.is_static = True
-        self.tombstone_color = (150, 150, 150)
-        self.border_color = (100, 100, 100)
+    def __init__(self):
+        """初始化墓碑障碍物"""
+        super().__init__()
+        self.speed = OBSTACLE_TYPES["tombstone"]["speed"]
+        self.damage = OBSTACLE_TYPES["tombstone"]["damage"]
     
-    def draw(self, surface):
-        """绘制坟墓障碍物"""
-        # 计算障碍物位置
-        rect = pygame.Rect(
-            self.position[0] * GRID_SIZE,
-            self.position[1] * GRID_SIZE,
-            GRID_SIZE, GRID_SIZE
-        )
+    def draw(self, surface, grid_size, use_images=True):
+        """
+        绘制墓碑障碍物
         
-        # 绘制坟墓
-        # 底部（略大一些）
-        base_height = GRID_SIZE // 3
-        base_rect = pygame.Rect(
-            rect.left + GRID_SIZE // 10,
-            rect.bottom - base_height,
-            rect.width - GRID_SIZE // 5,
-            base_height
-        )
-        pygame.draw.rect(surface, self.tombstone_color, base_rect)
-        pygame.draw.rect(surface, self.border_color, base_rect, 1)
-        
-        # 主体（上部分）
-        top_width = int(rect.width * 0.7)
-        top_height = int(rect.height * 0.8)
-        top_rect = pygame.Rect(
-            rect.centerx - top_width // 2,
-            rect.top + GRID_SIZE // 10,
-            top_width,
-            top_height
-        )
-        pygame.draw.rect(surface, self.tombstone_color, top_rect, border_radius=5)
-        pygame.draw.rect(surface, self.border_color, top_rect, 1, border_radius=5)
-        
-        # 添加裂纹装饰
-        for _ in range(2):
-            start_x = random.randint(int(top_rect.left + 2), int(top_rect.right - 2))
-            start_y = random.randint(int(top_rect.top + 2), int(top_rect.bottom - 2))
-            length = random.randint(3, 8)
-            angle = random.randint(0, 360)
-            end_x = start_x + math.cos(math.radians(angle)) * length
-            end_y = start_y + math.sin(math.radians(angle)) * length
-            pygame.draw.line(surface, self.border_color, (start_x, start_y), (end_x, end_y), 1)
+        参数:
+            surface: 绘制表面
+            grid_size: 网格大小
+            use_images: 是否使用图像
+        """
+        if self.image is not None and use_images:
+            super().draw(surface, grid_size, use_images)
+        else:
+            if not self.position:
+                return
+                
+            # 计算实际像素位置
+            x, y = self.position
+            pixel_x = x * grid_size
+            pixel_y = y * grid_size
+            
+            # 绘制墓碑
+            # 墓碑底座
+            pygame.draw.rect(
+                surface,
+                (100, 100, 100),  # 灰色
+                pygame.Rect(
+                    pixel_x + grid_size // 4,
+                    pixel_y + grid_size // 2,
+                    grid_size // 2,
+                    grid_size // 3
+                )
+            )
+            
+            # 墓碑主体
+            pygame.draw.rect(
+                surface,
+                (150, 150, 150),  # 浅灰色
+                pygame.Rect(
+                    pixel_x + grid_size // 4,
+                    pixel_y + grid_size // 6,
+                    grid_size // 2,
+                    grid_size // 2
+                ),
+                border_radius=3
+            )
+            
+            # 墓碑纹理
+            pygame.draw.line(
+                surface,
+                (100, 100, 100),  # 深灰色
+                (pixel_x + grid_size // 3, pixel_y + grid_size // 4),
+                (pixel_x + 2 * grid_size // 3, pixel_y + grid_size // 4),
+                1
+            )
+            
+            pygame.draw.line(
+                surface,
+                (100, 100, 100),  # 深灰色
+                (pixel_x + grid_size // 3, pixel_y + grid_size // 3),
+                (pixel_x + 2 * grid_size // 3, pixel_y + grid_size // 3),
+                1
+            )
+
 
 class ZombieObstacle(BaseObstacle):
     """
-    僵尸障碍物类
-    缓慢移动的障碍物
+    僵尸障碍物
+    会缓慢移动的障碍物
     """
     
-    def __init__(self, position=None):
+    def __init__(self):
         """初始化僵尸障碍物"""
-        super().__init__(position)
-        self.is_static = False
+        super().__init__()
         self.speed = OBSTACLE_TYPES["zombie"]["speed"]
         self.damage = OBSTACLE_TYPES["zombie"]["damage"]
-        self.direction = self._choose_direction()
-        self.position = list(self.position)  # 转换为列表以支持浮点位置
-        
-        # 僵尸外观颜色
-        self.zombie_colors = {
-            'body': (100, 140, 100),  # 僵尸身体颜色（灰绿色）
-            'head': (150, 170, 150),  # 僵尸头部颜色
-            'eyes': (255, 0, 0),      # 僵尸眼睛颜色（红色）
-            'detail': (70, 90, 70)    # 细节颜色
-        }
-        
-        # 头部摆动状态
-        self.head_tilt = 0
+        self.direction = random.choice([(0, 1), (0, -1), (1, 0), (-1, 0)])  # 随机初始方向
+        self.move_timer = 0
+        self.move_interval = 1.0 / self.speed if self.speed > 0 else float('inf')
     
-    def _choose_direction(self):
+    def update(self, delta_time, avoid_positions=None):
         """
-        选择随机移动方向
+        更新僵尸障碍物状态
         
-        返回:
-            tuple: 方向向量 (dx, dy)
+        参数:
+            delta_time: 时间增量
+            avoid_positions: 需要避开的位置列表
         """
-        directions = [(0, 1), (1, 0), (0, -1), (-1, 0)]
-        return random.choice(directions)
-    
-    def update(self, delta_time):
-        """更新僵尸位置和动画"""
-        super().update(delta_time)
+        super().update(delta_time, avoid_positions)
+        
+        # 如果速度为0，不移动
+        if self.speed <= 0:
+            return
+        
+        # 更新移动计时器
+        self.move_timer += delta_time
         
         # 移动僵尸
-        self.position[0] += self.direction[0] * self.speed * delta_time
-        self.position[1] += self.direction[1] * self.speed * delta_time
-        
-        # 检查边界，如果碰到边界则反向移动
-        if self.position[0] < 0:
-            self.position[0] = 0
-            self.direction = (-self.direction[0], self.direction[1])
-        elif self.position[0] >= GRID_WIDTH:
-            self.position[0] = GRID_WIDTH - 0.01
-            self.direction = (-self.direction[0], self.direction[1])
+        if self.move_timer >= self.move_interval:
+            self.move_timer = 0
             
-        if self.position[1] < 0:
-            self.position[1] = 0
-            self.direction = (self.direction[0], -self.direction[1])
-        elif self.position[1] >= GRID_HEIGHT:
-            self.position[1] = GRID_HEIGHT - 0.01
-            self.direction = (self.direction[0], -self.direction[1])
-        
-        # 更新头部摆动动画
-        self.head_tilt = math.sin(self.animation_time * 3) * 0.2
+            # 计算新位置
+            new_x = (self.position[0] + self.direction[0]) % GRID_WIDTH
+            new_y = (self.position[1] + self.direction[1]) % GRID_HEIGHT
+            new_position = (new_x, new_y)
+            
+            # 检查新位置是否可用
+            if avoid_positions and new_position in avoid_positions:
+                # 如果新位置不可用，改变方向
+                self.direction = random.choice([(0, 1), (0, -1), (1, 0), (-1, 0)])
+            else:
+                # 更新位置
+                self.position = new_position
+                
+                # 有小概率改变方向
+                if random.random() < 0.1:
+                    self.direction = random.choice([(0, 1), (0, -1), (1, 0), (-1, 0)])
     
-    def check_collision(self, snake):
-        """检查是否与蛇发生碰撞"""
-        # 获取整数位置用于碰撞检测
-        grid_position = (int(self.position[0]), int(self.position[1]))
+    def draw(self, surface, grid_size, use_images=True):
+        """
+        绘制僵尸障碍物
         
-        # 检查蛇头是否与僵尸碰撞
-        if snake.get_head_position() == grid_position:
-            # 如果蛇不是无敌状态，则判定为碰撞
-            if not snake.is_invincible():
-                return True
-        
-        return False
-    
-    def draw(self, surface):
-        """绘制僵尸障碍物"""
-        # 计算障碍物位置
-        x = int(self.position[0] * GRID_SIZE)
-        y = int(self.position[1] * GRID_SIZE)
-        
-        # 绘制僵尸身体
-        body_width = int(GRID_SIZE * 0.7)
-        body_height = int(GRID_SIZE * 0.9)
-        body_rect = pygame.Rect(
-            x + (GRID_SIZE - body_width) // 2,
-            y + (GRID_SIZE - body_height) // 2,
-            body_width,
-            body_height
-        )
-        pygame.draw.rect(surface, self.zombie_colors['body'], body_rect)
-        pygame.draw.rect(surface, self.zombie_colors['detail'], body_rect, 1)
-        
-        # 绘制僵尸头部（稍微歪斜一些，增加摇晃效果）
-        head_size = int(GRID_SIZE * 0.6)
-        head_center_x = x + GRID_SIZE // 2
-        head_center_y = y + GRID_SIZE // 3
-        
-        # 计算头部倾斜
-        tilt_x = math.sin(self.head_tilt) * 3
-        tilt_y = math.cos(self.head_tilt) * 1
-        
-        head_points = [
-            (head_center_x - head_size//2 + tilt_x, head_center_y - head_size//2 - tilt_y),
-            (head_center_x + head_size//2 + tilt_x, head_center_y - head_size//2 + tilt_y),
-            (head_center_x + head_size//2 - tilt_x, head_center_y + head_size//2 + tilt_y),
-            (head_center_x - head_size//2 - tilt_x, head_center_y + head_size//2 - tilt_y)
-        ]
-        pygame.draw.polygon(surface, self.zombie_colors['head'], head_points)
-        pygame.draw.polygon(surface, self.zombie_colors['detail'], head_points, 1)
-        
-        # 绘制僵尸眼睛
-        eye_size = 3
-        left_eye_x = head_center_x - head_size//4 + tilt_x//2
-        right_eye_x = head_center_x + head_size//4 + tilt_x//2
-        eye_y = head_center_y - head_size//8
-        
-        pygame.draw.circle(surface, self.zombie_colors['eyes'], (int(left_eye_x), int(eye_y)), eye_size)
-        pygame.draw.circle(surface, self.zombie_colors['eyes'], (int(right_eye_x), int(eye_y)), eye_size)
-        
-        # 绘制僵尸嘴（线条）
-        mouth_y = head_center_y + head_size//4
-        pygame.draw.line(
-            surface, 
-            self.zombie_colors['detail'],
-            (int(head_center_x - head_size//3 + tilt_x), int(mouth_y)),
-            (int(head_center_x + head_size//3 + tilt_x), int(mouth_y)),
-            2
-        )
+        参数:
+            surface: 绘制表面
+            grid_size: 网格大小
+            use_images: 是否使用图像
+        """
+        if self.image is not None and use_images:
+            super().draw(surface, grid_size, use_images)
+        else:
+            if not self.position:
+                return
+                
+            # 计算实际像素位置
+            x, y = self.position
+            pixel_x = x * grid_size
+            pixel_y = y * grid_size
+            
+            # 添加动画效果
+            wobble = math.sin(self.animation_offset * 2) * 2
+            
+            # 绘制僵尸
+            center_x = pixel_x + grid_size // 2
+            center_y = pixel_y + grid_size // 2
+            
+            # 绘制僵尸身体
+            body_color = (100, 100, 100)  # 灰色
+            pygame.draw.rect(
+                surface,
+                body_color,
+                pygame.Rect(
+                    center_x - grid_size // 3,
+                    center_y - grid_size // 4,
+                    grid_size // 1.5,
+                    grid_size // 2
+                )
+            )
+            
+            # 绘制僵尸头部
+            head_color = (150, 150, 150)  # 浅灰色
+            pygame.draw.circle(
+                surface,
+                head_color,
+                (center_x, center_y - grid_size // 3),
+                grid_size // 4
+            )
+            
+            # 绘制僵尸眼睛
+            eye_color = (255, 0, 0)  # 红色
+            pygame.draw.circle(
+                surface,
+                eye_color,
+                (center_x - grid_size // 8, center_y - grid_size // 3),
+                grid_size // 10
+            )
+            pygame.draw.circle(
+                surface,
+                eye_color,
+                (center_x + grid_size // 8, center_y - grid_size // 3),
+                grid_size // 10
+            )
+            
+            # 绘制僵尸手臂
+            arm_color = body_color
+            # 左臂
+            pygame.draw.line(
+                surface,
+                arm_color,
+                (center_x - grid_size // 3, center_y),
+                (center_x - grid_size // 2, center_y + wobble),
+                3
+            )
+            # 右臂
+            pygame.draw.line(
+                surface,
+                arm_color,
+                (center_x + grid_size // 3, center_y),
+                (center_x + grid_size // 2, center_y - wobble),
+                3
+            )
+
 
 class ObstacleManager:
     """
-    障碍物管理器类
+    障碍物管理器
     负责生成和管理障碍物
     """
     
-    def __init__(self, difficulty="medium"):
+    def __init__(self, game_engine):
         """
         初始化障碍物管理器
         
         参数:
-            difficulty (str): 难度级别
+            game_engine: 游戏引擎实例
         """
-        self.obstacles = []
-        self.difficulty = difficulty
-        self.spawn_timer = 0
-        self.max_obstacles = self._get_max_obstacles()
-    
-    def _get_max_obstacles(self):
-        """
-        根据难度获取最大障碍物数量
+        self.game_engine = game_engine
+        self.obstacles = []  # 障碍物列表
+        self.spawn_timer = 0  # 生成计时器
+        self.obstacle_images = {}  # 障碍物图像 {type: image}
+        self.grid_width = GRID_WIDTH
+        self.grid_height = GRID_HEIGHT
+        self.game_time = 0  # 游戏运行时间，用于延迟障碍物生成
+        self.max_obstacles = 5  # 最大障碍物数量
         
-        返回:
-            int: 最大障碍物数量
-        """
-        if self.difficulty == "easy":
-            return 3
-        elif self.difficulty == "medium":
-            return 5
-        else:  # hard
-            return 8
-    
-    def _get_spawn_interval(self):
-        """
-        获取障碍物生成间隔
+        # 加载障碍物图像
+        self.load_images()
         
-        返回:
-            float: 生成间隔（秒）
-        """
-        if self.difficulty == "easy":
-            return 8.0
-        elif self.difficulty == "medium":
-            return 5.0
-        else:  # hard
-            return 3.0
+        # 获取游戏难度
+        try:
+            self.difficulty = self.game_engine.settings.get("difficulty", "medium")
+            self.spawn_frequency = DIFFICULTY_LEVELS[self.difficulty]["obstacle_frequency"]
+        except Exception as e:
+            print(f"初始化障碍物管理器时出错: {e}")
+            # 使用默认值
+            self.difficulty = "medium"
+            self.spawn_frequency = 0.02
     
-    def update(self, delta_time, snake_positions):
+    def load_images(self):
+        """加载障碍物图像"""
+        # 检查是否使用图像
+        use_images = self.game_engine.settings.get("use_images", True)
+        
+        if not use_images:
+            return
+        
+        # 加载每种障碍物的图像
+        for obstacle_type, obstacle_info in OBSTACLE_TYPES.items():
+            image_name = obstacle_info["image"]
+            if image_name:
+                image_path = f"{OBSTACLES_IMAGES_DIR}/{image_name}"
+                self.obstacle_images[obstacle_type] = self.game_engine.resource_loader.load_image(image_path)
+    
+    def spawn_obstacle(self, obstacle_type=None, position=None, avoid_positions=None):
+        """
+        生成障碍物
+        
+        参数:
+            obstacle_type: 障碍物类型，如果为None则随机选择
+            position: 障碍物位置，如果为None则随机生成
+            avoid_positions: 需要避开的位置列表
+            
+        返回:
+            BaseObstacle: 生成的障碍物
+        """
+        # 如果没有指定障碍物类型，随机选择
+        if obstacle_type is None:
+            obstacle_type = random.choice(list(OBSTACLE_TYPES.keys()))
+        
+        # 创建障碍物实例
+        if obstacle_type == "zombie":
+            obstacle = ZombieObstacle()
+        else:
+            obstacle = TombstoneObstacle()
+        
+        # 设置障碍物属性
+        obstacle.speed = OBSTACLE_TYPES[obstacle_type]["speed"]
+        obstacle.damage = OBSTACLE_TYPES[obstacle_type]["damage"]
+        
+        # 设置障碍物图像
+        if obstacle_type in self.obstacle_images:
+            obstacle.image = self.obstacle_images[obstacle_type]
+        
+        # 如果没有指定位置，随机生成位置
+        if position is None:
+            # 确保障碍物不会生成在蛇身上或其他障碍物上
+            existing_positions = []
+            
+            # 添加其他障碍物的位置
+            for existing_obstacle in self.obstacles:
+                existing_positions.append(existing_obstacle.position)
+            
+            # 添加需要避开的位置
+            if avoid_positions:
+                existing_positions.extend(avoid_positions)
+            
+            # 尝试生成障碍物
+            if not obstacle.spawn(existing_positions):
+                return None  # 如果无法生成障碍物，返回None
+        else:
+            obstacle.position = position
+        
+        # 添加到障碍物列表
+        self.obstacles.append(obstacle)
+        
+        return obstacle
+    
+    def update(self, delta_time, avoid_positions=None):
         """
         更新所有障碍物
         
         参数:
-            delta_time: 时间增量（秒）
-            snake_positions: 蛇身体位置列表
+            delta_time: 时间增量
+            avoid_positions: 需要避开的位置列表
         """
+        # 更新游戏时间
+        self.game_time += delta_time
+        
         # 更新现有障碍物
         for obstacle in self.obstacles:
-            obstacle.update(delta_time)
+            obstacle.update(delta_time, avoid_positions)
         
-        # 检查是否需要生成新障碍物
+        # 障碍物生成计时器
         self.spawn_timer += delta_time
-        if (len(self.obstacles) < self.max_obstacles and 
-            self.spawn_timer >= self._get_spawn_interval()):
+        
+        # 只有在游戏开始10秒后才开始生成障碍物
+        if self.game_time < 10.0:
+            return
+        
+        # 限制障碍物的最大数量
+        if len(self.obstacles) >= self.max_obstacles:
+            return
+        
+        # 根据难度和计时器决定是否生成新的障碍物
+        if self.spawn_timer >= 3.0 and random.random() < self.spawn_frequency:
             self.spawn_timer = 0
-            self.spawn_obstacle(snake_positions)
-    
-    def spawn_obstacle(self, snake_positions):
-        """
-        生成新障碍物
-        
-        参数:
-            snake_positions: 蛇身体位置列表，用于避免障碍物生成在蛇身上
-        """
-        # 选择障碍物类型
-        if random.random() < 0.3:  # 30%几率生成僵尸
-            obstacle = ZombieObstacle()
-        else:  # 70%几率生成坟墓
-            obstacle = TombstoneObstacle()
-        
-        # 确保障碍物不会生成在蛇身上
-        attempts = 0
-        grid_position = (int(obstacle.position[0]), int(obstacle.position[1]))
-        while grid_position in snake_positions and attempts < 20:
-            if isinstance(obstacle, ZombieObstacle):
-                obstacle = ZombieObstacle()
-            else:
-                obstacle = TombstoneObstacle()
-            grid_position = (int(obstacle.position[0]), int(obstacle.position[1]))
-            attempts += 1
-        
-        # 添加到障碍物列表
-        if attempts < 20:  # 如果找到合适位置
-            self.obstacles.append(obstacle)
+            self.spawn_obstacle(avoid_positions=avoid_positions)
     
     def check_collisions(self, snake):
         """
-        检查蛇是否与任何障碍物碰撞
+        检查蛇与障碍物的碰撞
         
         参数:
             snake: 蛇对象
-        
+            
         返回:
-            bool: 是否有碰撞
+            bool: 是否发生碰撞
         """
-        for obstacle in self.obstacles:
-            if obstacle.check_collision(snake):
-                return True
-        return False
+        try:
+            # 获取蛇头位置
+            if not snake or not hasattr(snake, 'positions') or not snake.positions:
+                return False
+                
+            head_pos = snake.positions[0]
+            
+            # 检查是否与任何障碍物碰撞
+            for obstacle in self.obstacles:
+                if head_pos == obstacle.position:
+                    # 如果蛇有护盾，不会碰撞
+                    if hasattr(snake, 'shield_active') and snake.shield_active:
+                        return False
+                    
+                    return True
+            
+            return False
+        except Exception as e:
+            print(f"检查障碍物碰撞时出错: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
     
     def draw(self, surface):
         """
@@ -386,19 +485,4 @@ class ObstacleManager:
             surface: 渲染目标表面
         """
         for obstacle in self.obstacles:
-            obstacle.draw(surface)
-    
-    def set_difficulty(self, difficulty):
-        """
-        设置难度
-        
-        参数:
-            difficulty (str): 难度级别
-        """
-        self.difficulty = difficulty
-        self.max_obstacles = self._get_max_obstacles()
-    
-    def clear(self):
-        """清除所有障碍物"""
-        self.obstacles.clear()
-        self.spawn_timer = 0 
+            obstacle.draw(surface, GRID_SIZE, self.game_engine.settings.get("use_images", True)) 

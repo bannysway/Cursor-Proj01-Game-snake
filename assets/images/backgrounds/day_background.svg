@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="800"
+   height="600"
+   viewBox="0 0 800 600"
+   version="1.1"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <!-- PvZ风格白天背景 -->
+  
+  <!-- 天空 -->
+  <rect
+     x="0"
+     y="0"
+     width="800"
+     height="600"
+     fill="#9dd1ff" />
+  
+  <!-- 远处的云朵 -->
+  <g fill="white" fill-opacity="0.8">
+    <!-- 云朵1 -->
+    <ellipse cx="100" cy="100" rx="50" ry="30" />
+    <ellipse cx="150" cy="90" rx="40" ry="25" />
+    <ellipse cx="70" cy="90" rx="30" ry="20" />
+    
+    <!-- 云朵2 -->
+    <ellipse cx="300" cy="150" rx="60" ry="35" />
+    <ellipse cx="350" cy="140" rx="45" ry="30" />
+    <ellipse cx="260" cy="140" rx="35" ry="25" />
+    
+    <!-- 云朵3 -->
+    <ellipse cx="600" cy="120" rx="55" ry="32" />
+    <ellipse cx="650" cy="110" rx="42" ry="28" />
+    <ellipse cx="560" cy="110" rx="32" ry="22" />
+    
+    <!-- 云朵4 -->
+    <ellipse cx="450" cy="80" rx="40" ry="25" />
+    <ellipse cx="490" cy="75" rx="30" ry="20" />
+    <ellipse cx="420" cy="75" rx="25" ry="18" />
+  </g>
+  
+  <!-- 太阳 -->
+  <g>
+    <circle
+       cx="700"
+       cy="100"
+       r="60"
+       fill="#fae950" />
+    
+    <!-- 太阳光芒 -->
+    <g stroke="#fae950" stroke-width="6">
+      <line x1="700" y1="20" x2="700" y2="0" />
+      <line x1="700" y1="180" x2="700" y2="200" />
+      <line x1="620" y1="100" x2="600" y2="100" />
+      <line x1="780" y1="100" x2="800" y2="100" />
+      <line x1="642" y1="42" x2="628" y2="28" />
+      <line x1="758" y1="158" x2="772" y2="172" />
+      <line x1="642" y1="158" x2="628" y2="172" />
+      <line x1="758" y1="42" x2="772" y2="28" />
+    </g>
+    
+    <!-- 太阳表情 -->
+    <circle cx="680" cy="90" r="8" fill="#e6d040" />
+    <circle cx="720" cy="90" r="8" fill="#e6d040" />
+    <path
+       d="M 680,120 C 690,130 710,130 720,120"
+       stroke="#e6d040"
+       stroke-width="5"
+       fill="none" />
+  </g>
+  
+  <!-- 草地网格 -->
+  <g>
+    <!-- 偶数行偶数列 - 浅绿色 -->
+    <g fill="#81d44b">
+      <rect x="0" y="0" width="30" height="30" transform="translate(0,300)" />
+      <rect x="60" y="0" width="30" height="30" transform="translate(0,300)" />
+      <!-- 继续添加更多网格... -->
+    </g>
+    
+    <!-- 奇数行奇数列 - 浅绿色 -->
+    <g fill="#81d44b">
+      <rect x="30" y="30" width="30" height="30" transform="translate(0,300)" />
+      <rect x="90" y="30" width="30" height="30" transform="translate(0,300)" />
+      <!-- 继续添加更多网格... -->
+    </g>
+    
+    <!-- 其他位置 - 深绿色 -->
+    <g fill="#57b73b">
+      <rect x="30" y="0" width="30" height="30" transform="translate(0,300)" />
+      <rect x="0" y="30" width="30" height="30" transform="translate(0,300)" />
+      <rect x="90" y="0" width="30" height="30" transform="translate(0,300)" />
+      <rect x="60" y="30" width="30" height="30" transform="translate(0,300)" />
+      <!-- 继续添加更多网格... -->
+    </g>
+  </g>
+  
+  <!-- 草地装饰 - 小草 -->
+  <g fill="#3a7927" fill-opacity="0.8">
+    <path d="M 50,350 L 55,330 L 60,350" stroke="#3a7927" stroke-width="2" fill="none" />
+    <path d="M 150,360 L 155,340 L 160,360" stroke="#3a7927" stroke-width="2" fill="none" />
+    <path d="M 250,355 L 255,335 L 260,355" stroke="#3a7927" stroke-width="2" fill="none" />
+    <path d="M 350,365 L 355,345 L 360,365" stroke="#3a7927" stroke-width="2" fill="none" />
+    <path d="M 450,350 L 455,330 L 460,350" stroke="#3a7927" stroke-width="2" fill="none" />
+    <path d="M 550,360 L 555,340 L 560,360" stroke="#3a7927" stroke-width="2" fill="none" />
+    <path d="M 650,355 L 655,335 L 660,355" stroke="#3a7927" stroke-width="2" fill="none" />
+    <path d="M 750,365 L 755,345 L 760,365" stroke="#3a7927" stroke-width="2" fill="none" />
+  </g>
+</svg> 

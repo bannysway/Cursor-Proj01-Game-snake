@@ -1,170 +1,330 @@
 """
-蛇实体类
-负责蛇的移动、生长和绘制
+蛇实体
+定义蛇的行为和渲染
 """
 
 import pygame
 import math
 from config import (
-    GRID_WIDTH, GRID_HEIGHT, GRID_SIZE, 
+    GRID_SIZE, GRID_WIDTH, GRID_HEIGHT, 
     UP, DOWN, LEFT, RIGHT,
-    PVZ_GREEN, PVZ_LIGHT_GREEN, PVZ_DARK_GREEN, WHITE, BLACK
+    PVZ_GREEN, PVZ_DARK_GREEN, WHITE
 )
 
 class Snake:
     """
-    蛇实体类
-    负责蛇的移动、生长、碰撞检测和绘制
+    蛇类
+    控制蛇的移动、生长和渲染
     """
     
-    def __init__(self):
-        """初始化蛇"""
-        # 蛇的位置，初始在屏幕中央
-        self.positions = [(GRID_WIDTH // 2, GRID_HEIGHT // 2)]
-        
-        # 方向和移动
-        self.direction = RIGHT        # 当前方向
-        self.next_direction = RIGHT   # 下一步的方向
-        self.grew = False             # 是否刚吃了食物需要生长
-        
-        # 动画
-        self.animation_offset = 0.0   # 动画偏移量，用于制作摆动效果
-        
-        # 特殊能力
-        self.abilities = {}           # 特殊能力 {ability_name: duration}
-        self.invincible = False       # 是否无敌（不会碰撞死亡）
-        self.speed_multiplier = 1.0   # 速度倍率
-        self.is_shield_active = False # 是否有护盾
-    
-    def get_head_position(self):
+    def __init__(self, game_engine):
         """
-        获取蛇头位置
-        
-        返回:
-            tuple: 蛇头坐标 (x, y)
-        """
-        return self.positions[0]
-    
-    def update_direction(self, direction):
-        """
-        更新蛇的移动方向
-        不能直接向相反方向移动，例如向右移动时不能直接向左移动
+        初始化蛇
         
         参数:
-            direction (tuple): 新方向
+            game_engine: 游戏引擎实例
         """
-        # 检查是否是相反方向
-        opposite_direction = (direction[0] * -1, direction[1] * -1)
-        if opposite_direction != self.direction:
+        self.game_engine = game_engine
+        self.resource_loader = game_engine.resource_loader
+        self.use_images = game_engine.settings.get("use_images", True)
+        
+        # 蛇的身体部分
+        self.positions = [(GRID_WIDTH // 2, GRID_HEIGHT // 2)]  # 初始位置在中心
+        self.direction = RIGHT  # 初始方向向右
+        self.next_direction = RIGHT  # 下一步的方向
+        self.growth_pending = 0  # 待增长的长度
+        
+        # 特殊能力
+        self.shield_active = False  # 护盾是否激活
+        self.shield_timer = 0  # 护盾持续时间
+        self.speed_boost_active = False  # 速度提升是否激活
+        self.speed_boost_timer = 0  # 速度提升持续时间
+        self.speed_multiplier = 1.0  # 速度倍数
+        
+        # 动画参数
+        self.animation_time = 0  # 动画计时器
+        
+        # 图像资源
+        self.head_image = None
+        self.body_image = None
+        self.tail_image = None
+        self.turn_image = None
+        self.shield_effect_image = None
+        self.speed_effect_image = None
+        
+        # 加载图像
+        self._load_images()
+    
+    def _load_images(self):
+        """加载蛇的图像资源"""
+        if self.use_images and self.resource_loader:
+            self.head_image = self.resource_loader.load_image("snake_head")
+            self.body_image = self.resource_loader.load_image("snake_body")
+            self.tail_image = self.resource_loader.load_image("snake_tail")
+            self.turn_image = self.resource_loader.load_image("snake_turn")
+            self.shield_effect_image = self.resource_loader.load_image("shield_effect")
+            self.speed_effect_image = self.resource_loader.load_image("speed_effect")
+    
+    def reset(self):
+        """重置蛇到初始状态"""
+        self.positions = [(GRID_WIDTH // 2, GRID_HEIGHT // 2)]
+        self.direction = RIGHT
+        self.next_direction = RIGHT
+        self.growth_pending = 0
+        self.shield_active = False
+        self.shield_timer = 0
+        self.speed_boost_active = False
+        self.speed_boost_timer = 0
+        self.speed_multiplier = 1.0
+    
+    def set_direction(self, direction):
+        """
+        设置蛇的移动方向
+        
+        参数:
+            direction: 方向元组 (dx, dy)
+        """
+        # 防止180度转弯
+        if (direction[0] * -1, direction[1] * -1) != self.direction:
             self.next_direction = direction
+    
+    def grow(self, amount=1):
+        """
+        增加蛇的长度
+        
+        参数:
+            amount: 增加的长度
+        """
+        self.growth_pending += amount
     
     def move(self):
         """
         移动蛇
         
         返回:
-            bool: 如果游戏结束则返回True，否则返回False
+            bool: 如果发生碰撞返回True，否则返回False
         """
-        # 更新当前方向
+        # 更新方向
         self.direction = self.next_direction
         
-        # 获取蛇头位置
-        head = self.get_head_position()
+        # 获取头部位置
+        head_x, head_y = self.positions[0]
         
-        # 计算新的蛇头位置
+        # 计算新的头部位置
         new_head = (
-            (head[0] + self.direction[0]) % GRID_WIDTH,  # 如果超出边界则从另一侧出现
-            (head[1] + self.direction[1]) % GRID_HEIGHT
+            (head_x + self.direction[0]) % GRID_WIDTH,
+            (head_y + self.direction[1]) % GRID_HEIGHT
         )
         
         # 检查是否碰到自己
-        if new_head in self.positions[1:] and not self.invincible:
-            return True  # 游戏结束
+        if len(self.positions) > 1 and new_head in self.positions:
+            return True  # 碰撞
         
-        # 更新蛇的位置
-        self.positions.insert(0, new_head)  # 在列表头部添加新的蛇头
+        # 添加新的头部
+        self.positions.insert(0, new_head)
         
-        # 如果没有吃到食物，则移除蛇尾；否则保留蛇尾（蛇长度+1）
-        if not self.grew:
-            self.positions.pop()  # 移除蛇尾
+        # 如果有待增长的长度，减少一个单位
+        if self.growth_pending > 0:
+            self.growth_pending -= 1
         else:
-            self.grew = False  # 重置生长标志
+            # 否则移除尾部
+            self.positions.pop()
         
-        # 更新动画偏移量
-        self.animation_offset = (self.animation_offset + 0.2) % 6.28  # 2π
+        # 更新特殊能力计时器
+        if self.shield_active:
+            self.shield_timer -= 1
+            if self.shield_timer <= 0:
+                self.shield_active = False
         
-        # 更新特殊能力状态
-        self.update_abilities()
+        if self.speed_boost_active:
+            self.speed_boost_timer -= 1
+            if self.speed_boost_timer <= 0:
+                self.speed_boost_active = False
+                self.speed_multiplier = 1.0
         
-        return False  # 游戏继续
+        return False  # 没有碰撞
     
-    def grow(self):
-        """蛇吃到食物后生长"""
-        self.grew = True
-    
-    def add_ability(self, ability_name, duration):
+    def activate_shield(self, duration=100):
         """
-        添加特殊能力
+        激活护盾能力
         
         参数:
-            ability_name (str): 能力名称
-            duration (int): 持续时间（帧数）
+            duration: 护盾持续时间（帧数）
         """
-        # 更新或添加能力
-        self.abilities[ability_name] = duration
-        
-        # 根据能力类型应用效果
-        if ability_name == "shield":
-            self.invincible = True
-            self.is_shield_active = True
-        elif ability_name == "speed_up":
-            self.speed_multiplier = 1.5
+        self.shield_active = True
+        self.shield_timer = duration
     
-    def update_abilities(self):
-        """更新特殊能力状态"""
-        # 需要移除的能力
-        expired_abilities = []
+    def activate_speed_boost(self, duration=150, multiplier=1.5):
+        """
+        激活速度提升能力
         
-        # 更新所有能力的持续时间
-        for ability, duration in self.abilities.items():
-            # 减少持续时间
-            self.abilities[ability] = duration - 1
-            
-            # 检查能力是否已过期
-            if self.abilities[ability] <= 0:
-                expired_abilities.append(ability)
-        
-        # 移除过期的能力
-        for ability in expired_abilities:
-            if ability == "shield":
-                self.invincible = False
-                self.is_shield_active = False
-            elif ability == "speed_up":
-                self.speed_multiplier = 1.0
-            
-            del self.abilities[ability]
+        参数:
+            duration: 速度提升持续时间（帧数）
+            multiplier: 速度倍数
+        """
+        self.speed_boost_active = True
+        self.speed_boost_timer = duration
+        self.speed_multiplier = multiplier
     
     def get_speed(self):
         """
-        获取当前移动速度
+        获取当前速度倍数
         
         返回:
-            float: 速度倍率
+            float: 速度倍数
         """
         return self.speed_multiplier
     
-    def is_invincible(self):
+    def update(self, delta_time):
         """
-        检查是否处于无敌状态
+        更新蛇的状态
         
-        返回:
-            bool: 是否无敌
+        参数:
+            delta_time: 时间增量
         """
-        return self.invincible
+        self.animation_time += delta_time
     
     def draw(self, surface):
         """
-        在屏幕上绘制蛇 - 采用PvZ豌豆射手风格
+        在屏幕上绘制蛇
+        
+        参数:
+            surface: 渲染目标表面
+        """
+        if self.use_images and self.head_image and self.body_image and self.tail_image:
+            self._draw_with_images(surface)
+        else:
+            self._draw_with_shapes(surface)
+    
+    def _draw_with_images(self, surface):
+        """
+        使用图像绘制蛇
+        
+        参数:
+            surface: 渲染目标表面
+        """
+        for i, position in enumerate(self.positions):
+            # 计算蛇身体每一节的矩形位置
+            rect = pygame.Rect(
+                position[0] * GRID_SIZE,
+                position[1] * GRID_SIZE,
+                GRID_SIZE, GRID_SIZE
+            )
+            
+            # 确定使用哪个图像
+            if i == 0:  # 蛇头
+                image = self.head_image
+                # 根据方向旋转图像
+                if self.direction == UP:
+                    angle = 0
+                elif self.direction == RIGHT:
+                    angle = 90
+                elif self.direction == DOWN:
+                    angle = 180
+                elif self.direction == LEFT:
+                    angle = 270
+                
+                rotated_image = pygame.transform.rotate(image, angle)
+                image_rect = rotated_image.get_rect(center=rect.center)
+                surface.blit(rotated_image, image_rect)
+                
+                # 如果有护盾，绘制护盾效果
+                if self.shield_active and self.shield_effect_image:
+                    shield_rect = self.shield_effect_image.get_rect(center=rect.center)
+                    surface.blit(self.shield_effect_image, shield_rect)
+                
+                # 如果有速度提升，绘制速度效果
+                if self.speed_boost_active and self.speed_effect_image:
+                    speed_rect = self.speed_effect_image.get_rect(center=rect.center)
+                    surface.blit(self.speed_effect_image, speed_rect)
+                
+            elif i == len(self.positions) - 1:  # 蛇尾
+                image = self.tail_image
+                # 计算尾部方向
+                prev_pos = self.positions[i-1]
+                tail_dir = (
+                    position[0] - prev_pos[0],
+                    position[1] - prev_pos[1]
+                )
+                # 处理环绕情况
+                if tail_dir[0] > 1: tail_dir = (-1, 0)
+                if tail_dir[0] < -1: tail_dir = (1, 0)
+                if tail_dir[1] > 1: tail_dir = (0, -1)
+                if tail_dir[1] < -1: tail_dir = (0, 1)
+                
+                # 根据方向旋转图像
+                if tail_dir == UP:
+                    angle = 180
+                elif tail_dir == RIGHT:
+                    angle = 270
+                elif tail_dir == DOWN:
+                    angle = 0
+                elif tail_dir == LEFT:
+                    angle = 90
+                
+                rotated_image = pygame.transform.rotate(image, angle)
+                image_rect = rotated_image.get_rect(center=rect.center)
+                surface.blit(rotated_image, image_rect)
+                
+            else:  # 蛇身
+                # 检查是否是转弯部分
+                prev_pos = self.positions[i-1]
+                next_pos = self.positions[i+1]
+                
+                # 计算前后方向
+                dir_from_prev = (
+                    position[0] - prev_pos[0],
+                    position[1] - prev_pos[1]
+                )
+                dir_to_next = (
+                    next_pos[0] - position[0],
+                    next_pos[1] - position[1]
+                )
+                
+                # 处理环绕情况
+                if dir_from_prev[0] > 1: dir_from_prev = (-1, 0)
+                if dir_from_prev[0] < -1: dir_from_prev = (1, 0)
+                if dir_from_prev[1] > 1: dir_from_prev = (0, -1)
+                if dir_from_prev[1] < -1: dir_from_prev = (0, 1)
+                
+                if dir_to_next[0] > 1: dir_to_next = (-1, 0)
+                if dir_to_next[0] < -1: dir_to_next = (1, 0)
+                if dir_to_next[1] > 1: dir_to_next = (0, -1)
+                if dir_to_next[1] < -1: dir_to_next = (0, 1)
+                
+                # 检查是否是转弯
+                is_turn = dir_from_prev != dir_to_next and dir_from_prev != (-dir_to_next[0], -dir_to_next[1])
+                
+                if is_turn and self.turn_image:
+                    image = self.turn_image
+                    # 确定转弯类型和角度
+                    if (dir_from_prev == RIGHT and dir_to_next == UP) or (dir_from_prev == DOWN and dir_to_next == LEFT):
+                        angle = 0
+                    elif (dir_from_prev == UP and dir_to_next == RIGHT) or (dir_from_prev == LEFT and dir_to_next == DOWN):
+                        angle = 90
+                    elif (dir_from_prev == LEFT and dir_to_next == UP) or (dir_from_prev == DOWN and dir_to_next == RIGHT):
+                        angle = 270
+                    else:
+                        angle = 180
+                    
+                    rotated_image = pygame.transform.rotate(image, angle)
+                    image_rect = rotated_image.get_rect(center=rect.center)
+                    surface.blit(rotated_image, image_rect)
+                else:
+                    image = self.body_image
+                    # 确定身体部分的方向
+                    if dir_from_prev[0] != 0:  # 水平方向
+                        angle = 90
+                    else:  # 垂直方向
+                        angle = 0
+                    
+                    rotated_image = pygame.transform.rotate(image, angle)
+                    image_rect = rotated_image.get_rect(center=rect.center)
+                    surface.blit(rotated_image, image_rect)
+    
+    def _draw_with_shapes(self, surface):
+        """
+        使用基本图形绘制蛇
         
         参数:
             surface: 渲染目标表面
@@ -187,12 +347,29 @@ class Snake:
                 head_radius = radius + 2
                 
                 # 如果有护盾，绘制护盾效果
-                if self.is_shield_active:
+                if self.shield_active:
                     shield_radius = head_radius + 4
                     shield_color = (100, 200, 255, 150)  # 半透明蓝色
                     shield_surface = pygame.Surface((shield_radius*2, shield_radius*2), pygame.SRCALPHA)
                     pygame.draw.circle(shield_surface, shield_color, (shield_radius, shield_radius), shield_radius)
                     surface.blit(shield_surface, (center_x - shield_radius, center_y - shield_radius))
+                
+                # 如果有速度提升，绘制速度效果
+                if self.speed_boost_active:
+                    speed_radius = head_radius + 6
+                    speed_color = (255, 200, 0, 100)  # 半透明黄色
+                    speed_surface = pygame.Surface((speed_radius*2, speed_radius*2), pygame.SRCALPHA)
+                    
+                    # 绘制速度线条
+                    for angle in range(0, 360, 45):
+                        rad_angle = math.radians(angle)
+                        start_x = speed_radius + math.cos(rad_angle) * (head_radius + 2)
+                        start_y = speed_radius + math.sin(rad_angle) * (head_radius + 2)
+                        end_x = speed_radius + math.cos(rad_angle) * speed_radius
+                        end_y = speed_radius + math.sin(rad_angle) * speed_radius
+                        pygame.draw.line(speed_surface, speed_color, (start_x, start_y), (end_x, end_y), 2)
+                    
+                    surface.blit(speed_surface, (center_x - speed_radius, center_y - speed_radius))
                 
                 # 绘制头部
                 pygame.draw.circle(surface, PVZ_GREEN, (center_x, center_y), head_radius)
@@ -202,42 +379,43 @@ class Snake:
                 eye_offset_x = 4 * (1 if self.direction[0] >= 0 else -1)
                 eye_offset_y = 4 * (1 if self.direction[1] >= 0 else -1)
                 
-                # 如果是横向移动，眼睛在水平方向上偏移
+                # 如果是水平方向，眼睛在左右
                 if self.direction[0] != 0:
-                    pygame.draw.circle(surface, WHITE, 
-                                    (center_x + eye_offset_x, center_y - 3), 4)
-                    pygame.draw.circle(surface, WHITE, 
-                                    (center_x + eye_offset_x, center_y + 3), 4)
-                    pygame.draw.circle(surface, BLACK, 
-                                    (center_x + eye_offset_x + 1, center_y - 3), 2)
-                    pygame.draw.circle(surface, BLACK, 
-                                    (center_x + eye_offset_x + 1, center_y + 3), 2)
-                # 如果是纵向移动，眼睛在垂直方向上偏移
+                    pygame.draw.circle(surface, WHITE, (center_x + eye_offset_x, center_y - 3), 3)
+                    pygame.draw.circle(surface, WHITE, (center_x + eye_offset_x, center_y + 3), 3)
+                    pygame.draw.circle(surface, (0, 0, 0), (center_x + eye_offset_x, center_y - 3), 1)
+                    pygame.draw.circle(surface, (0, 0, 0), (center_x + eye_offset_x, center_y + 3), 1)
+                # 如果是垂直方向，眼睛在上下
                 else:
-                    pygame.draw.circle(surface, WHITE, 
-                                    (center_x - 3, center_y + eye_offset_y), 4)
-                    pygame.draw.circle(surface, WHITE, 
-                                    (center_x + 3, center_y + eye_offset_y), 4)
-                    pygame.draw.circle(surface, BLACK, 
-                                    (center_x - 3, center_y + eye_offset_y + 1), 2)
-                    pygame.draw.circle(surface, BLACK, 
-                                    (center_x + 3, center_y + eye_offset_y + 1), 2)
-            else:  # 蛇身 - 豌豆串成的身体
-                # 根据位置添加轻微的波动效果
-                wave_offset = math.sin(self.animation_offset + i * 0.5) * 2
-                body_center_y = center_y + wave_offset
+                    pygame.draw.circle(surface, WHITE, (center_x - 3, center_y + eye_offset_y), 3)
+                    pygame.draw.circle(surface, WHITE, (center_x + 3, center_y + eye_offset_y), 3)
+                    pygame.draw.circle(surface, (0, 0, 0), (center_x - 3, center_y + eye_offset_y), 1)
+                    pygame.draw.circle(surface, (0, 0, 0), (center_x + 3, center_y + eye_offset_y), 1)
                 
-                # 绘制稍小的圆形身体
-                body_radius = radius - 1
+            else:  # 蛇身
+                body_radius = radius
                 
-                # 绘制豌豆身体
-                pygame.draw.circle(surface, PVZ_LIGHT_GREEN, (center_x, body_center_y), body_radius)
-                pygame.draw.circle(surface, PVZ_GREEN, (center_x, body_center_y), body_radius, 1)
+                # 绘制身体
+                pygame.draw.circle(surface, PVZ_GREEN, (center_x, center_y), body_radius)
+                pygame.draw.circle(surface, PVZ_DARK_GREEN, (center_x, center_y), body_radius, 1)
                 
-                # 添加叶子细节
-                if i % 3 == 0:  # 每隔几节添加一片叶子
-                    leaf_size = 4
-                    leaf_x = center_x + (radius - 2)
-                    leaf_y = body_center_y - (radius - 2)
-                    pygame.draw.ellipse(surface, PVZ_DARK_GREEN, 
-                                     pygame.Rect(leaf_x, leaf_y, leaf_size*2, leaf_size)) 
+                # 添加一些细节
+                if i % 2 == 0:
+                    detail_radius = body_radius // 2
+                    pygame.draw.circle(surface, PVZ_DARK_GREEN, (center_x, center_y), detail_radius, 1)
+    
+    def add_ability(self, ability_name):
+        """
+        添加特殊能力
+        
+        参数:
+            ability_name: 能力名称，如"shield"或"speed_up"
+        """
+        if ability_name == "shield":
+            self.activate_shield()
+            print("激活护盾能力")
+        elif ability_name == "speed_up":
+            self.activate_speed_boost()
+            print("激活速度提升能力")
+        else:
+            print(f"未知能力: {ability_name}") 

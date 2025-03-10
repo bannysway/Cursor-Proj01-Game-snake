@@ -10,6 +10,14 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 SOUNDS_DIR = os.path.join(ASSETS_DIR, "sounds")
 FONTS_DIR = os.path.join(ASSETS_DIR, "fonts")
+IMAGES_DIR = os.path.join(ASSETS_DIR, "images")
+
+# 图像资源子目录
+SNAKE_IMAGES_DIR = os.path.join(IMAGES_DIR, "snake")
+FOOD_IMAGES_DIR = os.path.join(IMAGES_DIR, "food")
+OBSTACLES_IMAGES_DIR = os.path.join(IMAGES_DIR, "obstacles")
+BACKGROUNDS_IMAGES_DIR = os.path.join(IMAGES_DIR, "backgrounds")
+UI_IMAGES_DIR = os.path.join(IMAGES_DIR, "ui")
 
 # 窗口设置
 WINDOW_WIDTH = 800
@@ -46,17 +54,26 @@ FOOD_TYPES = {
     "sun": {
         "weight": 70,  # 生成权重
         "score": 10,   # 得分
-        "effect": None # 特殊效果
+        "effect": None, # 特殊效果
+        "image": "sun.png"  # 图像文件名
     },
     "sunflower": {
         "weight": 20,
         "score": 20,
-        "effect": None
+        "effect": None,
+        "image": "sunflower.png"
     },
     "walnut": {
         "weight": 10,
         "score": 5,
-        "effect": "shield"
+        "effect": "shield",
+        "image": "walnut.png"
+    },
+    "peashooter": {
+        "weight": 15,
+        "score": 15,
+        "effect": "speed_up",
+        "image": "peashooter.png"
     }
 }
 
@@ -64,11 +81,13 @@ FOOD_TYPES = {
 OBSTACLE_TYPES = {
     "zombie": {
         "speed": 0.5,   # 移动速度
-        "damage": 1     # 造成的伤害
+        "damage": 1,    # 造成的伤害
+        "image": "zombie.png"  # 图像文件名
     },
     "tombstone": {
         "speed": 0,     # 静止障碍物
-        "damage": 1
+        "damage": 1,
+        "image": "tombstone.png"
     }
 }
 
@@ -77,17 +96,20 @@ SCENES = {
     "day": {
         "background": PVZ_SKY_BLUE,
         "grid_colors": [PVZ_GREEN, PVZ_LIGHT_GREEN],
-        "special_rules": None
+        "special_rules": None,
+        "background_image": "day_background.png"
     },
     "night": {
         "background": (30, 30, 60),
         "grid_colors": [(30, 80, 30), (20, 60, 20)],
-        "special_rules": "reduced_visibility"
+        "special_rules": "reduced_visibility",
+        "background_image": "night_background.png"
     },
     "pool": {
         "background": (100, 180, 255),
         "grid_colors": [PVZ_GREEN, PVZ_LIGHT_GREEN],
-        "special_rules": "water_tiles"
+        "special_rules": "water_tiles",
+        "background_image": "pool_background.png"
     }
 }
 
@@ -101,15 +123,38 @@ SOUNDS = {
     "zombie_groan": "zombie_groan.wav"
 }
 
+# 图像设置
+IMAGES = {
+    # 蛇图像
+    "snake_head": "snake_head.png",
+    "snake_body": "snake_body.png",
+    "snake_tail": "snake_tail.png",
+    "snake_turn": "snake_turn.png",
+    
+    # UI图像
+    "button_normal": "button_normal.png",
+    "button_hover": "button_hover.png",
+    "button_pressed": "button_pressed.png",
+    "menu_background": "menu_background.png",
+    "game_over_background": "game_over_background.png",
+    
+    # 特效图像
+    "shield_effect": "shield_effect.png",
+    "speed_effect": "speed_effect.png",
+    "explosion": "explosion.png"
+}
+
 # 特殊能力设置
 ABILITIES = {
     "shield": {
         "duration": 100,  # 持续时间(帧数)
-        "effect": "invincible"
+        "effect": "invincible",
+        "icon": "shield_icon.png"
     },
     "speed_up": {
         "duration": 150,
-        "effect": "increase_speed"
+        "effect": "increase_speed",
+        "icon": "speed_icon.png"
     }
 }
 
@@ -124,22 +169,23 @@ FONT_SIZES = {
 DIFFICULTY_LEVELS = {
     "easy": {
         "speed": 8,
-        "obstacle_frequency": 0.01
+        "obstacle_frequency": 0.002  # 降低障碍物生成频率
     },
     "medium": {
         "speed": 10,
-        "obstacle_frequency": 0.02
+        "obstacle_frequency": 0.005  # 降低障碍物生成频率
     },
     "hard": {
         "speed": 12,
-        "obstacle_frequency": 0.03
+        "obstacle_frequency": 0.01  # 降低障碍物生成频率
     }
 }
 
 # 默认游戏设置
 DEFAULT_SETTINGS = {
-    "difficulty": "medium",
+    "difficulty": "easy",  # 将默认难度设置为easy
     "scene": "day",
     "music_volume": 0.7,
-    "sfx_volume": 1.0
+    "sfx_volume": 1.0,
+    "use_images": False  # 是否使用图像资源而不是绘制图形
 } 

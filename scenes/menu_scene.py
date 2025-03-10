@@ -36,22 +36,6 @@ class MenuScene(Scene):
                 'phase': random.random() * 6.28  # 随机初相位
             })
         
-        # 按钮状态
-        self.buttons = {
-            'start': {
-                'rect': pygame.Rect(WINDOW_WIDTH // 2 - 150, WINDOW_HEIGHT - 200, 300, 60),
-                'text': '开始游戏',
-                'hover': False,
-                'active': False
-            },
-            'quit': {
-                'rect': pygame.Rect(WINDOW_WIDTH // 2 - 150, WINDOW_HEIGHT - 120, 300, 60),
-                'text': '退出游戏',
-                'hover': False,
-                'active': False
-            }
-        }
-        
         # 闪烁效果计时器
         self.blink_timer = 0
         self.show_blink = True
@@ -61,6 +45,9 @@ class MenuScene(Scene):
     
     def enter(self, **kwargs):
         """进入菜单场景"""
+        # 设置UI管理器的活动按钮组为主菜单
+        self.ui_manager.set_active_group("main_menu")
+        
         # 加载并播放背景音乐
         # 注意: 目前可能没有音乐文件，所以这里只是尝试加载
         try:
@@ -75,43 +62,15 @@ class MenuScene(Scene):
     
     def handle_event(self, event):
         """处理事件"""
-        if event.type == pygame.MOUSEMOTION:
-            # 鼠标移动，检查按钮悬停状态
-            mouse_pos = pygame.mouse.get_pos()
-            for button in self.buttons.values():
-                button['hover'] = button['rect'].collidepoint(mouse_pos)
-        
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            # 鼠标点击
-            mouse_pos = pygame.mouse.get_pos()
-            for button_name, button in self.buttons.items():
-                if button['rect'].collidepoint(mouse_pos):
-                    button['active'] = True
-                    
-                    # 播放点击音效
-                    try:
-                        self.resource_loader.play_sound("menu_click")
-                    except:
-                        pass
-        
-        elif event.type == pygame.MOUSEBUTTONUP:
-            # 鼠标释放
-            mouse_pos = pygame.mouse.get_pos()
-            for button_name, button in self.buttons.items():
-                if button['active'] and button['rect'].collidepoint(mouse_pos):
-                    # 执行按钮动作
-                    if button_name == 'start':
-                        self.game_engine.change_scene('game')
-                    elif button_name == 'quit':
-                        self.game_engine.running = False
-                
-                button['active'] = False
-        
-        elif event.type == pygame.KEYDOWN:
+        if event.type == pygame.KEYDOWN:
             # 键盘事件
             if event.key == pygame.K_RETURN:
                 # 回车键开始游戏
                 self.game_engine.change_scene('game')
+                return True
+        
+        # 其他事件由UI管理器处理
+        return False
     
     def update(self, delta_time):
         """更新菜单场景"""
@@ -132,8 +91,8 @@ class MenuScene(Scene):
         # 绘制标题
         self._draw_title(surface)
         
-        # 绘制按钮
-        self._draw_buttons(surface)
+        # 绘制游戏说明
+        self._draw_instructions(surface)
         
         # 绘制版本信息
         version_text = self.font_manager.render_text(
@@ -280,49 +239,42 @@ class MenuScene(Scene):
             )
             surface.blit(instruction_text, instruction_rect)
     
-    def _draw_buttons(self, surface):
-        """绘制菜单按钮"""
-        for button_name, button in self.buttons.items():
-            # 根据按钮状态选择颜色
-            if button['active']:
-                # 按下状态
-                color = (0, 160, 0) if button_name == 'start' else (160, 0, 0)
-                border_color = (0, 100, 0) if button_name == 'start' else (100, 0, 0)
-            elif button['hover']:
-                # 悬停状态
-                color = (0, 180, 0) if button_name == 'start' else (180, 0, 0)
-                border_color = PVZ_DARK_GREEN if button_name == 'start' else (150, 0, 0)
+    def _draw_instructions(self, surface):
+        """绘制游戏说明"""
+        # 游戏说明背景
+        instructions_bg = pygame.Rect(
+            (WINDOW_WIDTH - 500) // 2,
+            WINDOW_HEIGHT // 2 - 50,
+            500,
+            200
+        )
+        pygame.draw.rect(surface, (0, 0, 0, 160), instructions_bg, border_radius=15)
+        pygame.draw.rect(surface, PVZ_DARK_GREEN, instructions_bg, 3, border_radius=15)
+        
+        instructions = [
+            "游戏说明:",
+            "用方向键控制豌豆射手移动",
+            "收集阳光可以得分并变长",
+            "撞到自己或僵尸会导致游戏结束",
+            "不同的植物食物有不同的效果",
+            "按回车键开始游戏",
+            "按ESC键退出游戏"
+        ]
+        
+        for i, instruction in enumerate(instructions):
+            if i == 0:  # 标题使用较大字体
+                instruction_text = self.font_manager.render_text(
+                    instruction, 
+                    self.font_manager.medium_font, 
+                    PVZ_LIGHT_GREEN
+                )
             else:
-                # 正常状态
-                color = PVZ_GREEN if button_name == 'start' else (200, 50, 50)
-                border_color = PVZ_DARK_GREEN if button_name == 'start' else (150, 0, 0)
-            
-            # 只有在闪烁显示或不是开始按钮时才绘制按钮
-            if self.show_blink or button_name != 'start':
-                # 绘制按钮
-                pygame.draw.rect(surface, color, button['rect'], border_radius=15)
-                pygame.draw.rect(surface, border_color, button['rect'], 3, border_radius=15)
-                
-                # 绘制按钮文本
-                text = self.font_manager.render_text(button['text'], self.font_manager.medium_font, WHITE)
-                text_rect = text.get_rect(center=button['rect'].center)
-                surface.blit(text, text_rect)
-            elif button_name == 'start':
-                # 当开始按钮闪烁消失时，恢复背景
-                for y in range(button['rect'].top, button['rect'].bottom, 30):
-                    for x in range(button['rect'].left, button['rect'].right, 30):
-                        # 棋盘格草地样式
-                        if ((x // 30) + (y // 30)) % 2 == 0:
-                            color = PVZ_GREEN
-                        else:
-                            color = PVZ_LIGHT_GREEN
-                        
-                        # 计算当前格子的矩形区域，考虑边界
-                        rect_x = x
-                        rect_y = y
-                        rect_width = min(30, button['rect'].right - x)
-                        rect_height = min(30, button['rect'].bottom - y)
-                        
-                        pygame.draw.rect(surface, color, pygame.Rect(
-                            rect_x, rect_y, rect_width, rect_height
-                        )) 
+                instruction_text = self.font_manager.render_text(
+                    instruction, 
+                    self.font_manager.small_font, 
+                    WHITE
+                )
+            instruction_rect = instruction_text.get_rect(
+                center=(WINDOW_WIDTH // 2, WINDOW_HEIGHT // 2 - 30 + i * 30)
+            )
+            surface.blit(instruction_text, instruction_rect) 

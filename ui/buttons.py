@@ -5,7 +5,7 @@
 
 import pygame
 import math
-from config import PVZ_GREEN, PVZ_DARK_GREEN, WHITE, PVZ_BROWN
+from config import PVZ_GREEN, PVZ_DARK_GREEN, WHITE, PVZ_BROWN, FONT_SIZES
 
 class Button:
     """基础按钮类"""
@@ -72,7 +72,10 @@ class Button:
         
         # 如果有文本，绘制文本
         if self.text and self.ui_manager:
-            font = self.ui_manager.font_manager.get_font(self.font_size)
+            # 获取字体大小
+            font_size_value = FONT_SIZES.get(self.font_size, FONT_SIZES["medium"])
+            # 获取字体
+            font = self.ui_manager.font_manager.get_font(self.ui_manager.font_manager.system_font, font_size_value)
             text_surface = font.render(self.text, True, self.text_color)
             text_rect = text_surface.get_rect(center=self.rect.center)
             surface.blit(text_surface, text_rect)
